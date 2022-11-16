@@ -5,9 +5,9 @@ import cv2
 # cap = cv2.VideoCapture(url)
 
 # 访问摄像机需要的信息
-ip = '192.168.1.9'
+ip = '192.168.1.10'
 user = 'admin'
-password = 'admin' # 访问摄像机需要密码
+password = 'admin'  # 访问摄像机需要密码
 # 抓取视频流
 cap = cv2.VideoCapture("rtsp://" + user + ":" + password + "@" + ip + ":8554/live")  # 端口port通常是固定的554
 ret, frame = cap.read()
