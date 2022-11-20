@@ -1,46 +1,42 @@
-import cv2
 import numpy as np
-from tracker import EuclideanDistTracker
-
-# 访问摄像机需要的信息
-ip = '192.168.1.10'
-user = 'admin'
-password = 'admin'  # 访问摄像机需要密码
-
-tracker = EuclideanDistTracker()
-cap = cv2.VideoCapture("rtsp://" + user + ":" + password + "@" + ip + ":8554/live")  # 抓取视频流端口,port通常是固定的554
-ret, frame1 = cap.read()
-ret, frame2 = cap.read()
-
-while cap.isOpened():
-    # ret, frame = cap.read()
-    diff = cv2.absdiff(frame1, frame2)
-    # this method is used to find the difference bw two  frames
-    gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    # here i would add the region of interest to count the single lane cars
-    height, width = blur.shape
-    print(height, width)
-    # thresh_value = cv2.getTrackbarPos('thresh', 'trackbar')
-    _, threshold = cv2.threshold(blur, 23, 255, cv2.THRESH_BINARY)
-    dilated = cv2.dilate(threshold, (1, 1), iterations=1)
-    contours, _, = cv2.findContours(dilated, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
-    detections = []
-    # DRAWING RECTANGLE BOX (Bounding Box)
-    for contour in contours:
-        (x, y, w, h) = cv2.boundingRect(contour)
-        if cv2.contourArea(contour) < 300:
+import cv2 as cv
+count1 = 0
+count2 = 0
+cv.namedWindow("frame",0);
+cv.resizeWindow("frame", 216*2, 384*2);
+vc = cv.VideoCapture(r"Z:\files\1111.mp4")
+writer1 = cv.VideoWriter(r'Z:\files\myresult.avi', cv.VideoWriter_fourcc(*'DIVX'), 30,
+                         (1920, 1080), True)#输出图像
+BS = cv.createBackgroundSubtractorMOG2(detectShadows=False)
+while (vc.isOpened()):
+    ret, frame = vc.read()
+    # ROI = frame[200:900,300,900]
+    # cv.line(frame, (0,600), (19200,600), (0,255,0), 2, 4)
+    gray = cv.cvtColor(frame,cv.COLOR_BGR2GRAY)
+    # ret,Binary = cv.threshold(gary,50,255,cv.THRESH_BINARY)
+    fgmask = BS.apply(gray)
+    image = cv.medianBlur(fgmask,5)
+    # cv.imshow("BS",fgmask)
+    element = cv.getStructuringElement(cv.MORPH_RECT,(1, 1));
+    element2 = cv.getStructuringElement(cv.MORPH_RECT, (1, 1));
+    image2 = cv.morphologyEx(image, cv.MORPH_OPEN,element);
+    image3 = cv.dilate(image2, element2)
+    # cv.imshow('frame', image3)
+    contours, hierarchy = cv.findContours(image3, cv.RETR_TREE, cv.CHAIN_APPROX_NONE)
+    for cnt in contours:
+        x, y, w, h = cv.boundingRect(cnt)
+        # if y+h == 600:
+        #     count1+=1
+        if cv.contourArea(cnt) < 10000 or w < 100 or h < 100 :
             continue
-        detections.append([x, y, w, h])
-    boxes_ids = tracker.update(detections)
-    for box_id in boxes_ids:
-        x, y, w, h, id = box_id
-        cv2.putText(frame1, str(id), (x, y - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-        cv2.rectangle(frame1, (x, y), (x + w, y + h), (0, 255, 0), 2)
-        cv2.imshow('frame', frame1)
-    frame1 = frame2
-    ret, frame2 = cap.read()
-    key = cv2.waitKey(30)
-    if key == ord('q'):
+        cv.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 3)
+        writer1.write(frame)#输出图形，可以看到掉帧现象极为明显
+        # cv.putText(frame,"Count:"+str(count1),(500,500),cv.FONT_HERSHEY_COMPLEX,2,(255,0,0))
+    # frame=cv.flip(frame, -1)
+    cv.imshow("frame",frame)
+    k = cv.waitKey(int(100/6)) & 0xff
+    if k == 27:
         break
-cv2.destroyAllWindows()
+vc.release()
+cv.destroyAllWindows()
+
