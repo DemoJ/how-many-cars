@@ -24,6 +24,7 @@ def get_count(frame,car_count):
 
         # 如果形状的面积大于1000且长宽比在1.5到3之间，判定为车辆
         if area > 1000 and 1.5 < ratio < 3:
+            cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
             car_count += 1
     return  car_count
 
