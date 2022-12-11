@@ -1,77 +1,67 @@
 import cv2
-import numpy as np
 
-def get_count(frame,car_count):
-# 进行图像处理
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+url = "rtsp://admin:admin123@192.168.1.6:8554/live"
+# 加载视频文件
+video = cv2.VideoCapture(url)
 
-    # 检测图像中的边缘
-    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+# 获取第一帧画面
+ret, frame = video.read()
 
-    # 检测图像中的形状
-    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+# 获取画面的高度和宽度
+height, width = frame.shape[:2]
 
-    # 遍历所有检测到的形状
-    for c in contours:
-        # 计算形状的面积
-        area = cv2.contourArea(c)
+# 创建背景减除器对象
+bg_subtractor = cv2.createBackgroundSubtractorMOG2()
 
-        # 计算形状的周长
-        perimeter = cv2.arcLength(c, True)
-
-        # 计算形状的长宽比
-        ratio = perimeter / (2 * np.sqrt(area))
-
-        # 如果形状的面积大于1000且长宽比在1.5到3之间，判定为车辆
-        if area > 1000 and 1.5 < ratio < 3:
-            cv2.drawContours(frame, [c], -1, (0, 255, 0), 2)
-            car_count += 1
-    return  car_count
-
-# 打开摄像头
-camera = cv2.VideoCapture(r"Z:\files\1111.mp4")
-
+count1 = 0
 car_flow = 0
+MIN_CONTOUR_AREA = 1000
 
-# 读取第一帧图像
-ret, frame1 = camera.read()
-
-# 初始化第一帧图像中的车辆数量为0
-car_count1 = 0
-
-# 检测第一帧图像中的车辆
-car_count1=get_count(frame1,car_count1)
-
-
-# 设置循环条件，持续读取摄像头的帧
 while True:
-    ret, frame2 = camera.read()
+    count2 = 0
+    # 读取下一帧画面
+    ret, frame = video.read()
 
-    # 如果到达视频末尾，退出循环
+    # 如果没有更多帧画面，退出循环
     if not ret:
         break
 
-    car_count2 = 0
-    # 检测第二帧图像中的车辆
-    car_count2=get_count(frame2,car_count2)
+    # 运用背景减除器处理当前帧画面
+    mask = bg_subtractor.apply(frame)
 
-    # 计算两帧图像中车辆数的差值
-    car_diff = car_count2 - car_count1
+    # 腐蚀处理得到的掩模
+    mask = cv2.erode(mask, None, iterations=2)
+
+    # 对掩模进行阈值化处理
+    _, thresh = cv2.threshold(mask, 150, 255, cv2.THRESH_BINARY)
+
+    # 检测图像中的轮廓
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    # 循环遍历所有轮廓
+    for contour in contours:
+        # 计算轮廓的边界框
+        (x, y, w, h) = cv2.boundingRect(contour)
+
+        # 如果边界框的面积超过了阈值，则表示找到了运动的车辆
+        if cv2.contourArea(contour) > MIN_CONTOUR_AREA:
+            # 在当前帧画面中绘制红色矩形框，框住运动的车辆
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 0, 255), 2)
+            count2 += 1
+
+    car_diff = count2 - count1
     if car_diff > 0:
-        car_flow = car_flow+car_diff
-
-    # 更新第一帧图像中的车辆数量为第二帧图像中的车辆数量
-    car_count1 = car_count2
-
-    cv2.putText(frame2, f"Flow: {car_flow}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+        car_flow = car_flow + car_diff
+    count1 = count2
+    # 在当前帧画面中绘制
+    cv2.putText(frame, f"Flow: {car_flow}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
     # 展示图像
-    cv2.imshow("Camera", frame2)
+    cv2.imshow("Camera", frame)
 
     # 等待用户按下q键，退出循环
-    key = cv2.waitKey(int(100/6))
+    key = cv2.waitKey(1)
     if key == ord("q"):
         break
 
-camera.release()
+video.release()
 cv2.destroyAllWindows()
