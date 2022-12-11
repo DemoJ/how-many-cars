@@ -1,1 +1,1 @@
-# how-many-people-and-cars
+# how-many-cars
